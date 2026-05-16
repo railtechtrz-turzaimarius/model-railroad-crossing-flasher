@@ -26,6 +26,9 @@ Hardware Used:
 -Current-limiting resistors
 -Wiring and 5V power supply
 
+Circuit diagram:
+
+<img width="3000" height="1969" alt="circuit_image" src="https://github.com/user-attachments/assets/74fb87a6-ac3a-4dc0-86a3-e6e18237ed34" />
 
 
 This project is meant to create a realistic and reliable railway crossing automation system suitable for model railway enthusiasts and educational electronics projects, designed to be a plug-and-play, simple and compact system.
