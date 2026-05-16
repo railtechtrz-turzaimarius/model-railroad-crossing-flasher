@@ -1,5 +1,5 @@
 # model-railroad-crossing-flasher
-Arduino-based H0 railway crossing automation with bidirectional train detection, optical sensors, realistic fading signal lights and fail-safe logic.
+A simple, compact, plug-and-play Arduino-based model railway crossing automation with bidirectional train detection, optical sensors, realistic fading signal lights and fail-safe logic.
 
 The code can be tested on an already made Arduino Nano online simulator circuit: [https://wokwi.com/projects/463534180098859009](https://wokwi.com/projects/464211431898620929) 
 
