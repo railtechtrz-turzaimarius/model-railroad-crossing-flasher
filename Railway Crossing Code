@@ -1,0 +1,300 @@
+// RailTech-TRZ
+// Arduino Nano Railway Level Crossing Code - V1.6 - Simple Version (2 sensors / 4-8 red LEDs) 
+
+const int sensor1Pin = 2;
+const int sensor2Pin = 3;
+const int ledA = 5;
+const int ledB = 6;
+
+const unsigned long maxActiveTimeout = 120000UL;
+const unsigned long debounceMs = 40;
+const unsigned long clearHoldMs = 2000UL;
+const int fadeStep = 6;
+const unsigned long fadeInterval = 12;
+
+int state = 0;
+int starterSensor = 0;
+unsigned long activeStartMillis = 0;
+
+int lastRaw1 = HIGH, lastStable1 = HIGH;
+unsigned long lastChangeTime1 = 0;
+int lastRaw2 = HIGH, lastStable2 = HIGH;
+unsigned long lastChangeTime2 = 0;
+
+unsigned long clearHoldStart = 0;
+
+int curLed = 0;
+int brightA = 0;
+int brightB = 0;
+bool phaseFadeIn = true;
+unsigned long lastFadeMillis = 0;
+
+int stopLed = -1;
+
+void setup() 
+{
+  Serial.begin(9600);
+  pinMode(sensor1Pin, INPUT_PULLUP);
+  pinMode(sensor2Pin, INPUT_PULLUP);
+  pinMode(ledA, OUTPUT);
+  pinMode(ledB, OUTPUT);
+
+  analogWrite(ledA, 0);
+  analogWrite(ledB, 0);
+  brightA = brightB = 0;
+  lastFadeMillis = millis();
+
+  Serial.println("System ready. Any sensor can activate the system - the opposite sensor stops the power after 2 seconds once released.");
+  Serial.println("If the sensor becomes occupied again within the 2-second interval, operation continues.");
+
+}
+
+int debouncedEdge(int pin, int &lastRaw, int &lastStable, unsigned long &lastChangeTime) 
+{
+  int raw = digitalRead(pin);
+  unsigned long now = millis();
+
+  if (raw != lastRaw)
+ {
+    lastRaw = raw;
+    lastChangeTime = now;
+  }
+  if ((now - lastChangeTime) > debounceMs) 
+  {
+    if (raw != lastStable) 
+    {
+      int prev = lastStable;
+      lastStable = raw;
+      if (prev == HIGH && lastStable == LOW) return -1;
+      if (prev == LOW  && lastStable == HIGH) return +1;
+    }
+  }
+  return 0;
+}
+
+void beginActivate(int whichSensor) 
+{
+  state = 1;
+  starterSensor = whichSensor;
+  activeStartMillis = millis();
+  curLed = (starterSensor == 1) ? 0 : 1;
+  phaseFadeIn = true;
+  brightA = brightB = 0;
+  analogWrite(ledA, 0);
+  analogWrite(ledB, 0);
+  lastFadeMillis = millis();
+  clearHoldStart = 0;
+  stopLed = -1;
+
+  Serial.print(">>> ACTIVATED BY S1");
+  Serial.print(whichSensor);
+  Serial.println(" (occupied) <<<");
+}
+
+void beginStopping(const char *reason, int whichSensor)
+ {
+  if (state != 2) 
+  {
+    state = 2;
+    stopLed = curLed;
+    if (stopLed == 0) 
+    {
+      brightB = 0;
+      analogWrite(ledB, 0);
+    } 
+    else if (stopLed == 1)
+     {
+      brightA = 0;
+      analogWrite(ledA, 0);
+    }
+    Serial.print(">>> DEACTIVATION (");
+    Serial.print(reason);
+    if (whichSensor > 0) {
+      Serial.print(" pentru S"); Serial.print(whichSensor);
+    }
+    Serial.println(") - shutting down system...");
+  }
+}
+
+void finalizeStop(const char *reason, int whichSensor) 
+{
+  state = 0;
+  starterSensor = 0;
+  brightA = brightB = 0;
+  analogWrite(ledA, 0);
+  analogWrite(ledB, 0);
+  clearHoldStart = 0;
+  stopLed = -1;
+  Serial.print(">>> DEACTIVATED (");
+  Serial.print(reason);
+  if (whichSensor > 0) {
+    Serial.print(" BY S"); Serial.print(whichSensor);
+  }
+  Serial.println(") <<<");
+}
+
+void loop()
+ {
+  int edge1 = debouncedEdge(sensor1Pin, lastRaw1, lastStable1, lastChangeTime1);
+  int edge2 = debouncedEdge(sensor2Pin, lastRaw2, lastStable2, lastChangeTime2);
+
+  if (state == 0)
+   {
+    if (edge1 == -1) beginActivate(1);
+    else if (edge2 == -1) beginActivate(2);
+  } 
+  else if (state == 1) 
+  { 
+
+    if (starterSensor == 1) 
+    {
+      if (edge2 == +1) 
+      {
+        clearHoldStart = millis();
+        Serial.println("S2 released -> 2-second interval before deactivation");
+      }
+      if (edge2 == -1)
+       {
+        if (clearHoldStart != 0)
+         {
+          clearHoldStart = 0;
+          Serial.println("S2 occupied again -> operation continues");
+        }
+      }
+      if (clearHoldStart != 0 && (millis() - clearHoldStart >= clearHoldMs))
+       {
+        beginStopping("S2 released for the required time interval", 2);
+      }
+    } else if (starterSensor == 2) 
+    {
+      if (edge1 == +1) 
+      {
+        clearHoldStart = millis();
+        Serial.println("S1 released -> 2-second interval before deactivation");
+      }
+      if (edge1 == -1) 
+      {
+        if (clearHoldStart != 0) 
+        {
+          clearHoldStart = 0;
+          Serial.println("S1 occupied again -> operation continues");
+        }
+      }
+      if (clearHoldStart != 0 && (millis() - clearHoldStart >= clearHoldMs)) 
+      {
+        beginStopping("S1 released for the required time interval", 1);
+      }
+    }
+
+    if (millis() - activeStartMillis > maxActiveTimeout) 
+    {
+      beginStopping("timeout", 0);
+    }
+  } else if (state == 2) 
+  {
+    if (edge1 == -1) {
+      beginActivate(1);
+    } else if (edge2 == -1)
+     {
+      beginActivate(2);
+    }
+  }
+  unsigned long now = millis();
+  if (now - lastFadeMillis >= fadeInterval) 
+  {
+    lastFadeMillis += fadeInterval;
+
+    if (state == 1)
+     {
+      if (curLed == 0) 
+      {
+        if (phaseFadeIn) 
+        {
+          brightA += fadeStep;
+          if (brightA >= 255) { brightA = 255; phaseFadeIn = false; }
+        } 
+        else 
+        {
+          brightA -= fadeStep;
+          if (brightA <= 0) { brightA = 0; curLed = 1; phaseFadeIn = true; 
+          }
+        }
+        brightB = 0;
+      } 
+      else
+       {
+        if (phaseFadeIn) 
+        {
+          brightB += fadeStep;
+          if (brightB >= 255) 
+          { brightB = 255; phaseFadeIn = false; }
+        } 
+        else 
+        {
+          brightB -= fadeStep;
+          if (brightB <= 0) 
+          { brightB = 0; curLed = 0; phaseFadeIn = true; }
+        }
+        brightA = 0;
+      }
+      analogWrite(ledA, constrain(brightA, 0, 255));
+      analogWrite(ledB, constrain(brightB, 0, 255));
+    } 
+    else if (state == 2)
+     {
+      if (stopLed == 0) 
+      {
+
+        if (brightA > 0)
+         {
+          brightA -= fadeStep;
+          if (brightA < 0) brightA = 0;
+          analogWrite(ledA, constrain(brightA, 0, 255));
+        } 
+        else
+         {
+          finalizeStop("alimentare oprita", 0);
+        }
+        if (brightB != 0) 
+        { 
+          brightB = 0; analogWrite(ledB, 0); 
+        }
+      } 
+      else if (stopLed == 1)
+       {
+        if (brightB > 0) 
+        {
+          brightB -= fadeStep;
+          if (brightB < 0) brightB = 0;
+          analogWrite(ledB, constrain(brightB, 0, 255));
+        } 
+        else
+         {
+          finalizeStop("alimentare oprita", 0);
+        }
+        if (brightA != 0) 
+        { 
+          brightA = 0; analogWrite(ledA, 0); 
+          }
+      } 
+      else 
+      {
+        finalizeStop("no-stopLed", 0);
+      }
+    } 
+    else 
+    {
+      if (brightA != 0) { 
+        brightA = 0; analogWrite(ledA, 0); 
+      }
+      if (brightB != 0) 
+      { 
+        brightB = 0; analogWrite(ledB, 0); 
+        }
+    }
+  }
+  delay(1);
+}
+
+//Made by Turzai Edward Marius .
+
