@@ -1,0 +1,184 @@
+
+Required Components
+1. Arduino Nano
+The main control unit responsible for managing the LEDs and sensors.
+
+2. Red LEDs
+Used as the railway crossing warning signal lights.
+
+3. TCRT5000L Optical Sensors
+Used for train detection.
+
+4. Wires and Resistors (±680Ω & ±220Ω)
+Ensure proper electrical connections and LED protection.
+
+(The circuit diagram can be found in the README.md file and on the online Arduino simulator: https://wokwi.com/projects/464211431898620929
+
+
+Connection Table
+| Arduino Pin | Components                                               | Wire Colors + Resistors |
+| ----------- | -------------------------------------------------------- | ----------------------- |
+| D2          | FT Collector 1                                           | Yellow -                |
+| D3          | FT Collector 2                                           | Green -                 |
+| D5          | LED 1 Anode                                              | Burgundy + 680Ω         |
+| D6          | LED 2 Anode                                              | Red + 680Ω              |
+| 5V          | IR Anode 1 & 2                                           | Blue + 220Ω ×2          |
+| GND         | LED 1 & 2 Cathodes, IR 1 & 2 Cathodes, FT 1 & 2 Emitters | Black -                 |
+
+
+
+Wiring Description:
+
+The system wiring is based on a simplified circuit, using direct connections and resistor-assisted connections between the Arduino board and auxiliary components.
+The optical sensors consist of two components:
+
+- An Infrared LED (IR LED)
+- A Phototransistor (FT)
+
+These are connected to digital pins D2 and D3, as well as 5V and GND, and operate using the INPUT_PULLUP configuration
+The warning LEDs are connected to pins D5 and D6 through approximately 680Ω resistors, which limit current and protect the LEDs.
+The IR LEDs are powered from the 5V pin through 220Ω resistors, connected individually in series with each IR LED.
+All components share a common ground (GND) to ensure stable system operation.
+
+The chosen wire color coding was implemented to allow quick identification of connections during assembly and maintenance.
+
+The Arduino board operates at 5V, and can be powered using:
+
+- A computer USB port;
+- A phone charger;
+- Another regulated 5V power source.
+
+Additional red LEDs may be added to the system, either in parallel or in series, provided that the appropriate voltage, current requirements, and resistor values are respected.
+
+
+_______________________________________________________________________________________________________________________________
+
+System Operation Description:
+
+The system simulates a railway level crossing using two detection sensors and two warning lights controlled by an Arduino board.
+Its operation is based on a state machine, which manages the activation, operation, and deactivation of the system.
+In the initial state, the system remains inactive and waits for activation from either of the two sensors.
+When a sensor detects a train (transition from HIGH to LOW), the system activates and stores the train entry direction.
+Once activated, the warning LEDs begin operating alternately, simulating a realistic railway crossing signal.
+Their brightness is controlled through PWM (Pulse Width Modulation), producing a fade effect (smooth fading in and out).
+The system remains active until the train leaves the detection area.
+Deactivation does not occur immediately. Instead, a 2-second delay is applied after the opposite sensor becomes clear, preventing false shutdowns (for example, a bigger gap between rail cars).
+If the sensor becomes occupied again during this interval, the system continues operating without interruption.
+
+For safety purposes, a 120-second timeout mechanism is implemented to automatically deactivate the system in case of malfunction or excessively long activation.
+
+During deactivation, the currently active LED does not switch off abruptly but gradually fades out, simulating the realistic behavior of railway warning systems.
+After this process is completed, the system returns to the idle state, ready for a new activation cycle.
+
+The system logic is implemented using three main states:
+
+0 – Idle
+1 – Active
+2 – Deactivation
+
+Transitions between these states are determined by sensor signals and internal timing mechanisms.
+
+
+Serial Monitor – System Testing
+During operation, the system sends status messages through the Arduino IDE Serial Monitor, providing information about system activation, deactivation, and sensor states:
+
+
+System ready. Any sensor can activate the system - the opposite sensor stops the power after 2 seconds once released.
+If the sensor becomes occupied again within the 2-second interval, operation continues.
+
+>>> ACTIVATED BY S1 (occupied) <<<
+S2 released -> 2-second interval before deactivation
+
+S2 occupied again -> operation continues
+S2 released -> 2-second interval before deactivation
+>>> DEACTIVATION (S2 released for the required time interval) - shutting down system...
+>>> DEACTIVATED (power off) <<<
+
+>>> ACTIVATED BY S2 (occupied) <<<
+S1 released -> 2-second interval before deactivation
+
+S1 occupied again -> operation continues
+S1 released -> 2-second interval before deactivation
+>>> DEACTIVATION (S1 released for the required time interval) - shutting down system...
+>>> DEACTIVATED (power off) <<<
+
+
+__________________________________________________________________________________________________________________________________
+
+
+System Architecture and Code Functionality:
+
+The railway level crossing system is built around an Arduino Nano board, which acts as the central control unit. It reads information from the sensors and controls the warning LEDs according to the current system state.
+The operation is organized as a state machine, meaning a logical mechanism through which the system transitions from one state to another depending on events. In this case, there are three main states:
+
+- Idle state
+- Activation state
+- Deactivation state
+
+This structure is particularly suitable for an automation system, as it enables a controlled and predictable response to signals received from the sensors.
+The Arduino code represents the core of the system. It defines the system behavior and determines how it reacts to sensor input while controlling the warning LEDs.
+The code was written in C++, tested using online Arduino simulators, and later implemented on the website, where it can be easily copied by anyone interested in using it.
+
+Pin Definition:
+At the beginning of the code, variables are declared to define the pins used by the system:
+
+- Two pins for the sensors
+- Two pins for the red signal LEDs
+
+This stage is important because it ensures clear organization of hardware connections and allows easy modifications if changes are required in the future.
+
+Initial Configuration in setup():
+
+The setup() function runs only once when the system starts.
+Here, the pin modes are configured:
+
+- The sensors are set as inputs with internal pull-up resistors;
+- The LEDs are configured as outputs.
+
+Serial communication is also initialized at this stage, allowing status messages to be displayed in the Arduino IDE Serial Monitor.
+These messages serve a diagnostic purpose, helping monitor the operating state of the system during execution.
+
+Sensor Debouncing:
+In a real circuit, mechanical contacts or sensor signals may generate small fluctuations (noise) during switching.
+To avoid false readings, the code includes a debouncing function.
+This function verifies whether the signal change is stable and ignores very short fluctuations.
+As a result, the system achieves more reliable and accurate sensor readings.
+
+System Activation:
+
+When one of the sensors detects a train, the system enters the activation state.
+At this moment:
+
+- The triggering sensor is stored;
+- The warning lights are activated;
+- LED brightness values are reset;
+- Alternating operation between the red LEDs begins.
+
+This logic closely simulates the behavior of a real railway level crossing, where warning signals alert road users of an approaching train.
+
+Red Signal LED Operation:
+The red LEDs do not switch on and off abruptly. Instead, they use a fade effect, meaning their brightness gradually increases and decreases.
+This effect is achieved using PWM (Pulse Width Modulation), a method through which Arduino controls the apparent brightness of an LED by rapidly varying the time it remains powered.
+At any given moment, one LED is active while its brightness gradually decreases, after which the second LED takes over.
+
+This alternating behavior creates a highly realistic simulation of an actual railway crossing warning system.
+
+System Deactivation:
+The system does not stop immediately after the train is no longer detected.
+A 2-second safety delay is implemented after the opposite sensor is released, preventing false deactivations (for example, due to larger gaps between train wagons).
+If the sensor becomes active again during this interval, the system continues operating without interruption.
+This logic is particularly important because it better replicates the behavior of real railway automation systems.
+
+Safety Timeout:
+The code also includes a general timeout mechanism, which automatically deactivates the system if it remains active for too long.
+This safety measure helps prevent system lockups or unintended continuous operation in unforeseen situations.
+
+
+____________________________________________________________________________________________________-
+
+
+Further updates for the code with more features will be available soon!
+
+If you gave any questions, please contact me:
+Email: rail.tech.trz@gmail.com
+WhatsApp: https://www.c3f-asso.fr/
