@@ -270,7 +270,7 @@ void loop()
         } 
         else
          {
-          finalizeStop("power off", 0);
+          finalizeStop("alimentare oprita", 0);
         }
         if (brightA != 0) 
         { 
